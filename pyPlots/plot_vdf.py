@@ -140,7 +140,8 @@ def resampleReducer(V,f, inputcellsize, setThreshold, normvect, normvectX, slice
         R = np.stack((NY, NX, NZ)).T
     elif slicetype=="vecperp":
         R = np.stack((NY, NX, NZ)).T
-    #print(R)
+    print("R", R)
+    print("det R", np.linalg.det(R))
     vmins = np.amin(V,axis=0)
     vmaxs = np.amax(V,axis=0)
 
@@ -1093,8 +1094,9 @@ def plot_vdf(filename=None,
 
             # If empty VDF: plot whole v-space
             if ((xindexrange==[vxsize,0]) and (yindexrange==[vysize,0])):
-                xindexrange = [0,vxsize]
-                yindexrange = [0,vysize]
+               pass
+               xindexrange = [0,vxsize]
+               yindexrange = [0,vysize]
 
             xvalsrange = [ edgesX[xindexrange[0]] , edgesX[xindexrange[1]] ]
             yvalsrange = [ edgesY[yindexrange[0]] , edgesY[yindexrange[1]] ]
