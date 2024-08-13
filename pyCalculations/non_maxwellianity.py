@@ -79,21 +79,23 @@ def epsilon_M(f,cell,pop="proton",m=m_p, bulk=None, B=None,
 
     if B is None:
         try:
-            print("No B vector given, trying a restart reducer from " + f.file_name)
+            # print("No B vector given, trying a restart reducer from " + f.file_name)
             B = f.read_variable("B",cellids=cell)
         except:
-            print("No restart B found, trying for vg_b_vol from " + f.file_name)
+            # print("No restart B found, trying for vg_b_vol from " + f.file_name)
             try:
                 B = f.read_variable("vg_b_vol",cellids=cell)
             except:
-                print("No vg_b_vol available either")
+                pass
+                # print("No vg_b_vol available either")
         if bulk is not None and B is None:
             try:
-                print("Trying to load vg_b_vol from given bulk file "+bulk)
+                # print("Trying to load vg_b_vol from given bulk file "+bulk)
                 bulkfile_for_moments_reader=pt.vlsvfile.VlsvReader(bulk)
                 B = pt.vlsvfile.reader(bulkfile_for_moments.read_variable("vg_b_vol",cellids=cell))
             except:
-                print("Could not load vg_b_vol from bulk file "+bulk)
+                pass
+                # print("Could not load vg_b_vol from bulk file "+bulk)
         if B is None:
             warnings.warn("No B found, cannot proceed at cellid "+str(cell))
             return -1
@@ -118,7 +120,7 @@ def epsilon_M(f,cell,pop="proton",m=m_p, bulk=None, B=None,
             calc_moments = False
 
         except:
-            print("Could not get moments from bulk file " + bulk + ". Calculating them from the VDF..")
+            # print("Could not get moments from bulk file " + bulk + ". Calculating them from the VDF..")
             calc_moments = True
     else:
         calc_moments = True

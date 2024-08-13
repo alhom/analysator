@@ -29,7 +29,8 @@ import os
 import numbers
 import vlsvvariables
 from reduction import datareducers,multipopdatareducers,data_operators,v5reducers,multipopv5reducers
-from collections import Iterable,OrderedDict
+from collections.abc import Iterable
+from collections import OrderedDict
 from vlsvwriter import VlsvWriter
 from variable import get_data
 
