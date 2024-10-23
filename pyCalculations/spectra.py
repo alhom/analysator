@@ -1,7 +1,7 @@
 #
 # This file is part of Analysator.
 # Copyright 2013-2016 Finnish Meteorological Institute
-# Copyright 2017-2021 University of Helsinki
+# Copyright 2017-2024 University of Helsinki
 #
 # For details of usage, see the COPYING file and read the "Rules of the Road"
 # at http://www.physics.helsinki.fi/vlasiator/
@@ -36,7 +36,25 @@ def get_spectrum_energy(vlsvReader,
                         weight='flux',
                         differential=True, # weigh by eV
                         bindifferential=False, # weigh by d(eV)
-                        restart=True):
+                        ):
+   ''' Calculates particle (flux) spectra in energy.
+
+       :param vlsvReader:         VlsvReader to be used
+       :type vlsvReader:          :class:`vlsvfile.VlsvReader`
+       :param population:         Population to analyse
+       :param cid:                CellID to read
+       :param fMin:               VDF minimum threshold to include in calculation [1e-21], units of m^-6 s^3
+       :param EMin:               Energy bins minimum edge [100], units of eV
+       :param EMax:               Energy bins maximum edge [80e3], units of eV
+       :param nBins:              number of energy bins [66]
+       :param mass:               mass of particles to consider [proton mass], units of kg
+       :param weight:             Bin weighting scheme: 'flux' or '', ['flux']; particle flux spectrum or particle number spectrum, respectively
+       :param differential:       Weight bins by bin energy [True], use either this or following
+       :param bindifferential:    Weight results by bin width [False], use either this or above
+       :returns: 3-tuple of (success [bool], variableinfo_bin_values, bin_edges)
+
+
+   '''
 
    EkinBinEdges = np.logspace(np.log10(EMin),np.log10(EMax),nBins+1, endpoint=True)
    dE = EkinBinEdges[1:] - EkinBinEdges[:-1]
@@ -148,7 +166,7 @@ def get_spectrum_alongaxis_vel(vlsvReader,
                                nBins=200,
                                differential=True, # weigh by velocity
                                bindifferential=False, # weigh by d(velocity)
-                               restart=True):
+                               ):
 
    vlsvReader = pytools.vlsvfile.VlsvReader(vlsvReader)
 
