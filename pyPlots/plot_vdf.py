@@ -117,6 +117,8 @@ def doHistogram(f,VX,VY,Voutofslice,vxBinEdges,vyBinEdges,vthick,wflux=None):
                    (VX > min(vxBinEdges)) & (VX < max(vxBinEdges)) & 
                    (VY > min(vyBinEdges)) & (VY < max(vyBinEdges)) ]
     else:
+        print(VX, min(vxBinEdges), max(vxBinEdges))
+        print(VY, min(vyBinEdges), max(vyBinEdges))
         indexes = [(VX > min(vxBinEdges)) & (VX < max(vxBinEdges)) & 
                    (VY > min(vyBinEdges)) & (VY < max(vyBinEdges)) ]
 
@@ -879,8 +881,8 @@ def plot_vdf(filename=None,
             gridratio = cellsize
 
         # num must be vxsize+1 or vysize+1 in order to do both edges for each cell
-        VXBins = np.linspace(vxmin*gridratio,vxmax*gridratio,num=vxsize+1)
-        VYBins = np.linspace(vymin*gridratio,vymax*gridratio,num=vysize+1)            
+        VXBins = np.linspace(int(vxmin*gridratio),int(vxmax*gridratio),num=int(vxsize+1))
+        VYBins = np.linspace(int(vymin*gridratio),int(vymax*gridratio),num=int(vysize+1)) 
         
         # Read velocity data into histogram
         (checkOk,binsXY,edgesX,edgesY) = vSpaceReducer(vlsvReader,cellid,slicetype,normvect,VXBins, VYBins,pop=pop,

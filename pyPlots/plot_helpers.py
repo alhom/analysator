@@ -25,7 +25,7 @@ import pytools as pt
 import numpy as np
 from rotation import rotateTensorToVector
 
-PLANE = 'XY'
+PLANE = 'XZ'
 # or alternatively, 'XZ'
 
 CELLSIZE = 300000.0 # cell size
@@ -267,6 +267,23 @@ def numvecdottensor(inputarray, inputtensor):
     # Output array is of format [nx,ny,3]
     return result
 
+def PressureTensorFromVecs(diagonal, offdiag):
+    # Assumes diagonal is of format [nx, ny, 3]
+    # Assumes offdiag is of format [nx, ny, 3]
+    # output is of format [nx, ny, 3, 3]
+    [nx, ny] = diagonal.shape[0:2]
+    result = np.zeros([nx, ny, 3, 3])
+
+    result[:,:,0,0] = diagonal[:,:,0]
+    result[:,:,1,1] = diagonal[:,:,1]
+    result[:,:,2,2] = diagonal[:,:,2]
+    result[:,:,0,1] = result[:,:,1,0] = offdiag[:,:,2]
+    result[:,:,0,2] = result[:,:,2,0] = offdiag[:,:,1]
+    result[:,:,1,2] = result[:,:,2,1] = offdiag[:,:,0]
+
+    
+    return np.array(result)
+
 def TransposeVectorArray(inputarray):
     # Assumes input array is of format [nA,nB,nV]
     # Output array is of format [nB,nA,nV]
@@ -406,15 +423,46 @@ def vec_ElectricFieldForce(electricfield, numberdensity):
     # force[:,:,2] = (-1.) * numberdensity * electricfield[:,:,2] * unitcharge
     # return force
 
+def expr_electronCurrent(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['electron/vg_v','electron/vg_rho']
+    Vmap = TransposeVectorArray(pass_maps['electron/vg_v'])
+    Rhomap = pass_maps['electron/vg_rho'].T 
+    Jemap = np.multiply(Vmap, Rhomap)
+    return TransposeVectorArray(Jemap)
+    
+def expr_electronDensityGradient(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['electron/vg_rho']
+    Rhomap = pass_maps['electron/vg_rho'].T 
+    dRhomap = np.linalg.norm(numgradscalar(Rhomap), axis=-1)
+    return dRhomap.T
+
+def expr_gradBy(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['vg_b_vol']
+    Bmap = TransposeVectorArray(pass_maps['B'])
+    dBymap = np.linalg.norm(numgradscalar(Bmap[:,:,1]), axis=-1)
+    return dBymap.T
+
+def expr_electronDensityGradientRelative(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['electron/vg_rho']
+    Rhomap = pass_maps['electron/vg_rho'].T 
+    dRhomap = np.divide(np.linalg.norm(numgradscalar(Rhomap), axis=-1),Rhomap)
+    return dRhomap.T
+    
+    
+
 # pass_maps is a list of numpy arrays
 # Each array has 2 dimensions [ysize, xsize]
 # or 3 dimensions [ysize, xsize, components]
 def expr_Hall_mag(pass_maps, requestvariables=False):
     if requestvariables==True:
-        return ['B','rho']
+        return ['B','electron/vg_rho']
     Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
-    Rhomap = pass_maps['rho'].T # number density
-    Jmap = vec_currentdensity(Bmap)
+    Rhomap = pass_maps['electron/vg_rho'].T # number density
+    Jmap = vec_currentdensity_lim(Bmap)
     Hallterm = vec_Hallterm(Jmap,Bmap,Rhomap)
     return np.linalg.norm(Hallterm, axis=-1).T
 
@@ -426,6 +474,57 @@ def expr_Hall_aniso(pass_maps, requestvariables=False):
     Jmap = vec_currentdensity(Bmap)
     Hallterm = vec_Hallterm(Jmap,Bmap,Rhomap)
     return VectorArrayAnisotropy(Hallterm,Bmap).T
+
+def expr_J_proton(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['proton/vg_rho', 'proton/vg_v']
+    unitcharge = 1.602177e-19
+    Vmap = TransposeVectorArray(pass_maps['proton/vg_v'])
+    qmap = pass_maps['proton/vg_rho'].T * unitcharge
+    Jmap = Vmap
+    Jmap[:,:,0] = np.multiply(Vmap[:,:,0], qmap)
+    Jmap[:,:,1] = np.multiply(Vmap[:,:,1], qmap)
+    Jmap[:,:,2] = np.multiply(Vmap[:,:,2], qmap)
+    
+    return np.linalg.norm(Jmap, axis=-1).T
+    #return TransposeVectorArray(Jmap)
+
+def expr_J_electron(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['electron/vg_rho', 'electron/vg_v']
+    unitcharge = -1.602177e-19
+    Vmap = TransposeVectorArray(pass_maps['electron/vg_v'])
+    qmap = pass_maps['electron/vg_rho'].T * unitcharge
+    Jmap = Vmap
+    Jmap[:,:,0] = np.multiply(Vmap[:,:,0], qmap)
+    Jmap[:,:,1] = np.multiply(Vmap[:,:,1], qmap)
+    Jmap[:,:,2] = np.multiply(Vmap[:,:,2], qmap)
+    
+    return np.linalg.norm(Jmap, axis=-1).T
+    #return TransposeVectorArray(Jmap)
+
+def expr_J_p_e_delta(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['proton/vg_rho', 'proton/vg_v','electron/vg_rho', 'electron/vg_v']
+    unitcharge = -1.602177e-19
+    Vmap = TransposeVectorArray(pass_maps['electron/vg_v'])
+    qmap = pass_maps['electron/vg_rho'].T * unitcharge
+    Jemap = np.zeros(Vmap.shape)
+    Jemap[:,:,0] = np.multiply(Vmap[:,:,0], qmap)
+    Jemap[:,:,1] = np.multiply(Vmap[:,:,1], qmap)
+    Jemap[:,:,2] = np.multiply(Vmap[:,:,2], qmap)
+    
+    unitcharge = 1.602177e-19
+    Vmap = TransposeVectorArray(pass_maps['proton/vg_v'])
+    qmap = pass_maps['proton/vg_rho'].T * unitcharge
+    Jpmap = np.zeros(Vmap.shape)
+    Jpmap[:,:,0] = np.multiply(Vmap[:,:,0], qmap)
+    Jpmap[:,:,1] = np.multiply(Vmap[:,:,1], qmap)
+    Jpmap[:,:,2] = np.multiply(Vmap[:,:,2], qmap)
+    
+    Jmap = Jpmap + Jemap
+
+    return np.linalg.norm(Jmap, axis=-1).T
 
 def expr_J_mag(pass_maps, requestvariables=False):
     if requestvariables==True:
@@ -511,6 +610,38 @@ def expr_MagneticPressureForce_aniso(pass_maps, requestvariables=False):
     MagneticPressureForce = vec_MagneticPressureForce(Bmap)
     MagneticPressureForceAniso = VectorArrayAnisotropy(MagneticPressureForce, Bmap)
     return MagneticPressureForceAniso.T
+
+def expr_electronPressureAnisotropy(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['electron/vg_ptensor_diagonal', 'electron/vg_ptensor_offdiagonal', 'B']
+    diagmap = TransposeVectorArray(pass_maps['electron/vg_ptensor_diagonal'])
+    offdiagmap = TransposeVectorArray(pass_maps['electron/vg_ptensor_offdiagonal'])
+    Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
+    
+
+    ptensor = PressureTensorFromVecs(diagmap, offdiagmap)
+    ptensor = rotateTensorArrayToVectorArray(ptensor, Bmap)
+    return TensorArrayAnisotropy(ptensor).T
+
+def expr_electronTemperature(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['electron/vg_ptensor_diagonal', 'electron/vg_rho']
+    diagmap = TransposeVectorArray(pass_maps['electron/vg_ptensor_diagonal'])
+    rhomap = (pass_maps['electron/vg_rho']).T
+    trace = np.sum(diagmap, axis = -1)
+    t = np.divide(trace/3, rhomap)/1.38e-23
+    
+    return t.T
+
+def expr_protonTemperature(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['proton/vg_ptensor_diagonal', 'proton/vg_rho']
+    diagmap = TransposeVectorArray(pass_maps['proton/vg_ptensor_diagonal'])
+    rhomap = (pass_maps['proton/vg_rho']).T
+    trace = np.sum(diagmap, axis = -1)
+    t = np.divide(trace/3, rhomap)/1.38e-23
+    
+    return t.T
 
 # def expr_MagneticPressureForce_inplane_mag(pass_maps):
 #     Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
@@ -733,6 +864,37 @@ def expr_Fermi(pass_maps, requestvariables=False):
     # (A*B).sum(-1) is dot product
     result = Pparallel*(UExB*kappa).sum(-1)
     return result.T
+
+def expr_EJE_parallel(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['vg_b_vol','vg_eje']
+    # Needs B,E
+    Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
+    Emap = TransposeVectorArray(pass_maps['vg_eje']) # Electric field
+
+    Epara = VectorArrayParallelComponent(Emap, Bmap)
+    return Epara.T
+
+def expr_EJE_perp(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['vg_b_vol','vg_eje']
+    # Needs B,E
+    Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
+    Emap = TransposeVectorArray(pass_maps['vg_eje']) # Electric field
+
+    Eperp = VectorArrayPerpendicularComponent(Emap, Bmap)
+    return Eperp.T
+
+def expr_EJE_perp_over_para(pass_maps, requestvariables=False):
+    if requestvariables==True:
+        return ['vg_b_vol','vg_eje']
+    # Needs B,E
+    Bmap = TransposeVectorArray(pass_maps['B']) # Magnetic field
+    Emap = TransposeVectorArray(pass_maps['vg_eje']) # Electric field
+
+    Eperp = np.divide(VectorArrayPerpendicularComponent(Emap, Bmap),np.abs(VectorArrayParallelComponent(Emap, Bmap)))
+    
+    return Eperp.T
 
 def expr_EJ_parallel(pass_maps, requestvariables=False):
     if requestvariables==True:

@@ -1,25 +1,25 @@
-# 
+#
 # This file is part of Analysator.
 # Copyright 2013-2016 Finnish Meteorological Institute
 # Copyright 2017-2018 University of Helsinki
-# 
+#
 # For details of usage, see the COPYING file and read the "Rules of the Road"
 # at http://www.physics.helsinki.fi/vlasiator/
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-# 
+#
 
 # This file contains static spacecraft function for fetching variable data from multiple vlsv files and looking at the data in time
 
@@ -53,7 +53,7 @@ def cell_time_evolution( vlsvReader_list, variables, cellids, units="" ):
           # Do post processing:
           rho_data = rho.data
           non_existing_example_function(rho_data)
-   
+
 
    '''
    vlsvReader_list = np.atleast_1d(vlsvReader_list)
@@ -61,10 +61,12 @@ def cell_time_evolution( vlsvReader_list, variables, cellids, units="" ):
    cellids = np.atleast_1d(cellids)
    parameters = ["t","tstep","fileIndex"]
    parameter_units=["s","",""]
+   parameters = ["t", "fileIndex"]
+   parameter_units=["s", ""]
    #construct empty units, if none are given
    if (units == "") or (len(units) != len(variables)):
       units=[ "" for i in range(len(variables))]
-   #construct data 
+   #construct data
    data = [[] for i in range(len(parameters)+len(cellids)*len(variables))]
    for t in range(len(vlsvReader_list)):
       # Get the vlsv reader
@@ -91,8 +93,6 @@ def cell_time_evolution( vlsvReader_list, variables, cellids, units="" ):
       # Close the vlsv reader's file:
       vlsvReader.optimize_close_file()
    from output import output_1d
-   return output_1d( data, 
-                     parameters +  [variables[(int)(i)%(int)(len(variables))] for i in range(len(data)-len(parameters))], 
+   return output_1d( data,
+                     parameters +  [variables[(int)(i)%(int)(len(variables))] for i in range(len(data)-len(parameters))],
                      parameter_units + [units[(int)(i)%(int)(len(units))] for i in range(len(data)-len(parameters))] )
-
-
