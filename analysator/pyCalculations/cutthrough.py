@@ -27,7 +27,7 @@ import numpy as np
 import sys
 import logging
 
-def get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymin, ycells, zmax, zmin, zcells, cell_lengths, point1, point2 ):
+def get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymin, ycells, zmax, zmin, zcells, point1, point2 ):
    ''' Calculates coordinates to be used in the cut_through. The coordinates are calculated so that every cell gets picked in the coordinates.
        :param vlsvReader:       Some open VlsvReader
        :type vlsvReader:        :class:`vlsvfile.VlsvReader`
@@ -63,8 +63,9 @@ def get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymi
          logging.info("ERROR, invalid cell id!")
          return
       # Get the max and min boundaries:
-      min_bounds = vlsvReader.get_cell_coordinates(cellid) - 0.5 * cell_lengths
-      max_bounds = np.array([min_bounds[i] + cell_lengths[i] for i in range(0,3)])
+      dx = vlsvReader.get_cell_dx(cellid)
+      min_bounds = vlsvReader.get_cell_coordinates(cellid) - 0.5 * dx
+      max_bounds = np.array([min_bounds[i] + dx[i] for i in range(0,3)])
       # Check which boundary we hit first when we move in the unit_vector direction:
       coefficients_min = np.divide((min_bounds - iterator), unit_vector, out=np.full(min_bounds.shape, sys.float_info.max), where=np.logical_not(unit_vector==0.0))
       coefficients_max = np.divide((max_bounds - iterator), unit_vector, out=np.full(min_bounds.shape, sys.float_info.max), where=np.logical_not(unit_vector==0.0))
@@ -156,11 +157,8 @@ def cut_through( vlsvReader, point1, point2 ):
    if vlsvReader.get_cellid(point2) == 0:
       logging.info("ERROR, POINT2 IN CUT-THROUGH OUT OF BOUNDS!")
 
-   #Calculate cell lengths:
-   cell_lengths = np.array([(xmax - xmin)/(float)(xcells), (ymax - ymin)/(float)(ycells), (zmax - zmin)/(float)(zcells)])
-
    # Get list of coordinates for the cells:
-   return get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymin, ycells, zmax, zmin, zcells, cell_lengths, point1, point2 )
+   return get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymin, ycells, zmax, zmin, zcells, point1, point2 )
 
 
 def cut_through_swath(vlsvReader, point1, point2, width, normal):
@@ -236,7 +234,6 @@ def cut_through_step( vlsvReader, point1, point2 ):
    # Calculate cell lengths:
    cell_lengths = np.array([(xmax - xmin)/(float)(xcells), (ymax - ymin)/(float)(ycells), (zmax - zmin)/(float)(zcells)])
 
-
    # Initialize lists
    distances = [0]
    cellids = [vlsvReader.get_cellid(point1)]
@@ -246,6 +243,7 @@ def cut_through_step( vlsvReader, point1, point2 ):
 
    # Loop until final cellid is reached
    while True:
+      # cell_lengths = vlsvReader.get_cell_dx(cellids[-1]) # TODO adapt to variable dx properly
       newcoordinate = coordinates[-1]+cell_lengths*derivative
       newcellid = vlsvReader.get_cellid( newcoordinate )
 
@@ -301,10 +299,6 @@ def cut_through_curve(vlsvReader, curve):
    zmin = mesh_limits[2]
    zcells = mesh_size[2]
 
-
-   #Calculate cell lengths:
-   cell_lengths = np.array([(xmax - xmin)/(float)(xcells), (ymax - ymin)/(float)(ycells), (zmax - zmin)/(float)(zcells)])
-
    if(len(curve) < 2):
       logging.info("ERROR, less than 2 points in a curve")
       return None
@@ -320,7 +314,7 @@ def cut_through_curve(vlsvReader, curve):
        logging.info("ERROR, POINT1 IN CUT-THROUGH-CURVE OUT OF BOUNDS!")
      if vlsvReader.get_cellid(point2) == 0:
        logging.info("ERROR, POINT2 IN CUT-THROUGH-CURVE OUT OF BOUNDS!")
-     cut = get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymin, ycells, zmax, zmin, zcells, cell_lengths, point1, point2)
+     cut = get_cellids_coordinates_distances( vlsvReader, xmax, xmin, xcells, ymax, ymin, ycells, zmax, zmin, zcells, point1, point2)
      ccid = cut[0].data
      cedges = cut[1].data
      try:
