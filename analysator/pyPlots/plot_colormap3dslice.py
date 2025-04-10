@@ -566,7 +566,14 @@ def plot_colormap3dslice(filename=None,
         # Read data from file
         if operator is None:
             operator="pass"
-        datamap_info = f.read_variable_info(var, operator=operator)
+        print(len(idlist))
+        datamap_info = f.read_variable_info(var, operator=operator, cellids=idlist)
+        data_tmp = datamap_info.data
+        datamap_info.data = np.full((len(cellids), *data_tmp.shape[1:]),np.nan, dtype=data_tmp.dtype)
+        from operator import itemgetter
+        fids = itemgetter(*idlist)(f._VlsvReader__fileindex_for_cellid)
+        print(len(fids))
+        datamap_info.data[np.array(fids)] = data_tmp
 
         cb_title_use = datamap_info.latex
         # Check if vscale results in standard unit

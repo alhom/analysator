@@ -812,39 +812,82 @@ def ig_coords(variables, reader):
     return reader.get_ionosphere_node_coords() 
 
 
+
 def ig_open_closed(variables, reader):
-    # open: 2, closed: 1
+    
+    logging.info("Tracing ionospheric connectivity - this is a heavy operation")
+    # open: 2, closed: 1, unprocessed: 0, dangling: 3
     positions = np.atleast_2d(variables[0])
     io_rad = float(reader.get_config()['ionosphere']['radius'][0])
 
     oc_vals = np.zeros((positions.shape[0]))
+    np.where(np.any(np.isnan(positions),axis=1))
 
     n_idx, s_idx = np.where(positions[:,-1]>0)[0], np.where(positions[:,-1]<0)[0]
 
     def last_valid(traced_all):
         valid_idx = ~np.isnan(traced_all).any(axis = 2)  # shape: (N, iter)
         last_valid_idx = np.argmax(valid_idx == 0, axis=1) - 1 # shape: (iter,)
-        N_idx = np.arange(traced_all.shape[0])
-        return traced_all[N_idx, last_valid_idx, :]
+        dangling = last_valid_idx == traced_all.shape[1]-1
+        return traced_all[:, last_valid_idx, :], dangling
 
     if len(n_idx) > 0:
         traced_north = pt.calculations.static_field_tracer_3d(reader, positions[n_idx], 40000, 4e4, direction='-' )
-        last_north = last_valid(traced_north)
+        last_north, dangling = last_valid(traced_north)
         dist_n = np.linalg.norm(last_north, axis=1)
         oc_vals[n_idx] = (dist_n > io_rad).astype(int) + 1
+        oc_vals[n_idx[dangling]] = 3
 
     if len(s_idx) > 0:
         traced_south = pt.calculations.static_field_tracer_3d(reader, positions[s_idx], 40000, 4e4, direction='+')
-        last_south = last_valid(traced_south)
+        last_south, dangling = last_valid(traced_south)
         dist_s = np.linalg.norm(last_south, axis=1)
         oc_vals[s_idx] = (dist_s > io_rad).astype(int) + 1
+        oc_vals[s_idx[dangling]] = 3
 
     return oc_vals
 
-
+def connection_coordinates_fw(variables, reader):
     
-    
+    logging.info("Tracing connectivity - this is a heavy operation")
+    # open: 2, closed: 1, unprocessed: 0, dangling: 3
+    positions = np.atleast_2d(variables[0])
+    print("positions.shape",positions.shape)
+    oc_vals = np.zeros((positions.shape[0]))
 
+    def stop_at_ionosphere(vlsvReader,points):
+      Re = 6371000+100e3
+      [xmin, ymin, zmin, xmax, ymax, zmax] = vlsvReader.get_spatial_mesh_extent()
+      x = points[:, 0]
+      y = points[:, 1]
+      z = points[:, 2]
+      lower_bound = 1 * Re
+      distances = np.linalg.norm(points[:,:],axis = 1)
+      return (distances <= lower_bound) | (x < xmin)|(x > xmax) | (y < ymin)|(y > ymax) | (z < zmin)|(z > zmax)
+
+    def last_valid(traced_all):
+        valid_idx = ~np.isnan(traced_all).any(axis = 2)  # shape: (N, iter)
+        last_valid_idx = np.argmax(valid_idx==0, axis=1,keepdims=True)-1# shape: (iter,)
+      #   print(last_valid_idx, last_valid_idx.shape, traced_all.shape)
+        lg = np.take_along_axis(traced_all, np.expand_dims(last_valid_idx,axis=-1),axis=1).squeeze()
+      #   print(lg)
+        dangling = last_valid_idx == (traced_all.shape[1]-1)
+        return lg, dangling.squeeze()
+#        return traced_all[:,last_valid_idx,:], dangling
+
+    all_endpoints = np.empty((0,3))
+    maxtraces = 900
+    for pos in np.array_split(positions, max(1,positions.shape[0]//maxtraces),axis=0):
+      # print(pos)
+      traces = pt.calculations.static_field_tracer_3d(reader, pos, 40000, 4e4, direction='+', stop_condition=stop_at_ionosphere)
+      last_good, dangling = last_valid(traces)
+      endpoints = last_good.squeeze()
+      # print(all_endpoints.shape, endpoints.shape, dangling.shape, last_good.shape)
+      endpoints[dangling,:] = np.nan
+      # print(all_endpoints.shape, endpoints.shape, dangling.shape, last_good.shape)
+      all_endpoints = np.vstack((all_endpoints,endpoints))
+      
+    return all_endpoints
 
 def _normalize(vec):
    '''
@@ -1185,7 +1228,7 @@ v5reducers["ig_inplanecurrent"] = DataReducerVariable(["ig_e"], ig_inplanecurren
 v5reducers["ig_e"] = DataReducerVariable(["ig_potential"], ig_E, "V/m", 1, latex=r"$\vec{E}$",latexunits=r"$\mathrm{V}\,\mathrm{m}^{-1}$", useReader=True)
 v5reducers["ig_node_coordinates"] = DataReducerVariable([],ig_coords,"m",3, latex=r"$\vec{r}$", latexunits=r"$\mathrm{m}$", useReader=True)
 v5reducers["ig_mlt"] =  DataReducerVariable(["ig_node_coordinates"], mlt, "h", 1, latex=r"$\mathrm{MLT}$",latexunits=r"$\mathrm{h}$")
-v5reducers["ig_openclosed"] =  DataReducerVariable(["ig_upmappednodecoords"], ig_open_closed, "", 1, latex = r"$\mathrm{oc}$", latexunits=r"",useReader = True)
+v5reducers["ig_oc"] =  DataReducerVariable(["ig_upmappednodecoords"], ig_open_closed, "", 1, latex = r"$\mathrm{oc}$", latexunits=r"",useReader = True)
 
 
 
@@ -1312,6 +1355,9 @@ v5reducers["vg_derivatives/vg_dperbzvoldy"] = DataReducerVariable(["vg_dperbzvol
 v5reducers["vg_derivatives/vg_dperbxvoldz"] = DataReducerVariable(["vg_dperbxvoldz"], Alias, "T/m", 1, latex=r"$\Delta B_\mathrm{x,vol,vg,per} (\Delta Z)^{-1}$",latexunits=r"$\mathrm{T}\,\mathrm{m}^{-1}$")
 v5reducers["vg_derivatives/vg_dperbyvoldz"] = DataReducerVariable(["vg_dperbyvoldz"], Alias, "T/m", 1, latex=r"$\Delta B_\mathrm{y,vol,vg,per} (\Delta Z)^{-1}$",latexunits=r"$\mathrm{T}\,\mathrm{m}^{-1}$")
 v5reducers["vg_derivatives/vg_dperbzvoldz"] = DataReducerVariable(["vg_dperbzvoldz"], Alias, "T/m", 1, latex=r"$\Delta B_\mathrm{z,vol,vg,per} (\Delta Z)^{-1}$",latexunits=r"$\mathrm{T}\,\mathrm{m}^{-1}$")
+
+v5reducers["vg_connection_coordinates_fw_reducer"] =  DataReducerVariable(["vg_coordinates_cell_center"], connection_coordinates_fw, "m", 3, latex = r"$\mathrm{conn_fw}$", latexunits=r"$\mathrm{m}$",useReader = True)
+
 
 #multipopv5reducers
 multipopv5reducers = {}
