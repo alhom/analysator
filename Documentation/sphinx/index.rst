@@ -31,6 +31,12 @@ documentation for details.
    analysator_supported
    about
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Recipes
+
+   magnetopause
+
 
 .. toctree::
    :maxdepth: 2
