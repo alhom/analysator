@@ -313,7 +313,7 @@ class VlsvReader(object):
    def get_metadata_filename(self):
       pth, base = os.path.split(self.file_name)
       
-      s = os.path.join(pth,"vlsvmeta",base[:-5]+"_metadata.pkl")
+      s = os.path.join(pth,self.get_cache_folder(),base[:-5]+"_metadata.pkl")
       return s
 
    # def get_h5_metadata(self, key, default):
@@ -385,13 +385,14 @@ class VlsvReader(object):
       return s
 
    def get_linked_readers(self, reload=False):
-      self.__linked_files = self.get_reader_metadata("linked_reader_files", set())
+      # self.__linked_files = self.get_reader_metadata("linked_reader_files", set())
       if len(self.__linked_files)==0 or reload:
          if(os.path.isfile(self.get_linked_readers_filename())):
             with open(self.get_linked_readers_filename(), 'r') as f:
                l = f.readlines()
+               lines = [line.strip() for line in l]
                logging.info("Loaded linked readers from "+self.get_linked_readers_filename())
-               self.__linked_files.update(l)
+               self.__linked_files.update(lines)
                print(l)
 
       else:
@@ -404,22 +405,34 @@ class VlsvReader(object):
 
    def add_linked_file(self, fname):
       if os.path.exists(fname):
-         self.__linked_files.add(VlsvReader(fname))
+         if(fname not in self.__linked_files):
+            self.__linked_files.add(fname)
+            self.add_linked_reader(VlsvReader(fname))
       else:
          logging.warning("Could not link "+fname+" (path does not exist)")
 
-   def add_linked_reader(self, fname):
+   def add_linked_reader(self, reader_add):
+      fname = reader_add.file_name
       if os.path.exists(fname):
          for reader in self.__linked_readers:
             if fname == reader.file_name:
                return
-         self.__linked_readers.add(VlsvReader(fname))
+         try:
+            check = VlsvReader(fname).read_variable("CellID") == self.read_variable("CellID")
+            if ~np.all(check):
+               logging.error("Could not link "+fname+" (CellIDs are incompatible)")
+               return
+         except Exception as e:
+            logging.error("Could not link "+fname+" - CellIDs are very incompatible, see error",str(e))
+            raise e
+         self.__linked_readers.add(VlsvReader(reader_add))
+         self.add_linked_file(fname)
       else:
          logging.warning("Could not link "+fname+" (path does not exist)")
 
    def add_linked_readers(self):
       for fname in self.__linked_files:
-         self.add_linked_reader(fname)
+         self.add_linked_reader(VlsvReader(fname))
 
    def save_linked_readers_file(self, overwrite = False):
       fn = self.get_linked_readers_filename()
