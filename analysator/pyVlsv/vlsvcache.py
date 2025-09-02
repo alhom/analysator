@@ -34,6 +34,7 @@ from operator import itemgetter
 import re
 import rtree 
 import time
+import json
 
 class VariableCache:
     ''' Class for handling in-memory variable/reducer caching.
@@ -168,7 +169,60 @@ class FileCache:
 class MetadataFileCache(FileCache):
    ''' File caching class for storing "lightweight" metadata.
    '''
-   pass
+   def __init__(self, *args, **kwargs):
+      super(MetadataFileCache, self).__init__(*args, **kwargs)
+      self.__metadata_dict = {}
+
+   def get_metadata_filename(self):
+      pth, base = os.path.split(self.__reader.file_name)
+      
+      s = os.path.join(pth,self.get_cache_folder(),base[:-5]+"_metadata.json")
+      return s
+   
+
+   def get_metadata(self, key, default):
+      ''' Read metadata from metadata file, and if not available,
+      return the given default value.
+
+      :param data: str, a key to stored metadata.
+      :param default: value to return if key does not exist
+
+      '''
+     
+      if not self.__metadata_read:
+         try:
+            fn = self.get_metadata_filename()
+            with open(fn,'r') as f:
+               self.__metadata_dict = json.load(f)
+         except:
+            logging.debug("No metadata file found.")
+         self.__metadata_read = True
+      
+      return self.__metadata_dict.get(key,default)
+   
+   def add_metadata(self, key, value):
+      self.__metadata_dict[key] = value
+      self.save_metadata()
+
+   def apply_to_metadata(self, key, op, arg, default=None):
+      ''' Apply operation op to value of metadatadict key
+
+      '''
+      import functools
+      dictval = self.__metadata_dict.get(key, default)
+      
+      bound_func = functools.partial(op, dictval)
+      bound_func(arg)
+      self.__metadata_dict[key] = dictval # in case value wasn't set
+
+   def save_metadata(self):
+      fn = self.get_metadata_filename()
+      try:
+         with open(fn,'w') as f:
+            json.dump(self.__metadata_dict,f)
+      except Exception as e:
+         logging.warning("Could not save metadata file, error: "+str(e))
+
    # superclass constructor called instead if no __init__ here
    # def __init__(self, reader) -> None:
    #    super(MetadataFileCache, self).__init__(reader)
