@@ -202,14 +202,7 @@ def point_time_evolution( vlsvReader_list, variables, coordinates, units="", met
 class VlsvTInterpolator:
    ''' Class for setting up a time-interpolation wrapper from a list of VLSV files.
    Requires either files_list or vlsvReaders_list as input.
-
-       :param files_list:               List containing paths to VLSV files
-       :type files_list:                :class:`str`
-       :param vlsvReaders_list:         List containing VlsvReaders with a file open
-       :type vlsvReaders_list:          :class:`vlsvfile.VlsvReader`
-
-       :returns:  a callable object that can be used to interpolate values in time and space from the given files.
-       :returns: an array containing the data for the time evolution for every coordinate
+   The class instance is a callable object that can be used to interpolate values in time and space from the given files.
 
        .. code-block:: python
 
@@ -219,14 +212,24 @@ class VlsvTInterpolator:
 
 
           # Now plot the results:
-          time = time_interpolator.ts
-          rho = [time_interpolator(t, [1e8,0,0], "proton/vg_rho")]
+          times = np.linspace(min(time_interpolator.ts),max(time_interpolator.ts),20)
+          rho = [time_interpolator(t, [1e8,0,0], "proton/vg_rho") for t in times]
           pt.plot.plot_variables(time, rho)
-          pl.show()
 
    '''
 
    def __init__(self, files_list=[], vlsvReaders_list=[]):
+      ''' Initialize a time-interpolation wrapper from a list of VLSV files.
+   Requires either files_list or vlsvReaders_list as input.
+
+       :param files_list:               List containing paths to VLSV files
+       :type files_list:                class:`str`, optional
+       :param vlsvReaders_list:         List containing VlsvReaders with a file open
+       :type vlsvReaders_list:          class:`vlsvfile.VlsvReader`, optional
+
+       :return:  a callable object that can be used to interpolate values in time and space from the given files.
+       '''
+
       self.ts = []
       
       self.files = files_list
