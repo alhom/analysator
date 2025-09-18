@@ -636,9 +636,14 @@ class VlsvVtkReader(VTKPythonAlgorithmBase):
          self.Modified()
          self.__FileName = filename
          if self.__FileName is not None:
-            self.__reader = pt.vlsvfile.VlsvReader(self.__FileName)
+            if self.__reader is None:
+               self.__reader = pt.vlsvfile.VlsvReader(self.__FileName)
             fn = os.path.basename(self.__FileName)
             self.__metafile = os.path.join(self.__reader.get_cache_folder(),"vlsvvtkcache.pkl")
+
+   def SetReader(self, reader):
+      self.__reader = reader
+      self.SetFileName(reader.file_name)
 
    def GetFileName(self):
       return self.__FileName
