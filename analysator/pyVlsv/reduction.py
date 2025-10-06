@@ -516,8 +516,13 @@ def Anisotropy( variables ):
 def Pressure( variables ):
    ''' Data reducer for finding the scalar pressure
    '''
+   print(variables[0], variables[0].dtype)
    PTensorDiagonal = variables[0]
-   return 1.0/3.0 * np.ma.sum(np.ma.masked_invalid(PTensorDiagonal),axis=-1)
+   third = 1./3.
+   result = third * np.ma.sum(np.ma.masked_invalid(PTensorDiagonal),axis=-1)
+   print(np.ma.sum(np.ma.masked_invalid(PTensorDiagonal),axis=-1).dtype, type(np.ma.sum(np.ma.masked_invalid(PTensorDiagonal),axis=-1)))
+   print((third *np.ma.sum(np.ma.masked_invalid(PTensorDiagonal),axis=-1)).dtype, type(third *np.ma.sum(np.ma.masked_invalid(PTensorDiagonal),axis=-1)))
+   return result
 
 def Pdyn( variables ):
    ''' Data reducer function for dynamic pressure

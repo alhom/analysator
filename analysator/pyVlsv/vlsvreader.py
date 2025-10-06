@@ -1071,13 +1071,16 @@ class VlsvReader(object):
          if (name,operator) in self.variable_cache.keys():
             return self.read_variable_from_cache(name, cellids, operator)
 
+      scalarQuery = False
       if isinstance(cellids, numbers.Number):
          if cellids >= 0:
             read_filelayout = True
          else: # cellids = -1
             read_filelayout = False
+         scalarQuery = True
       else:
          read_filelayout = True
+         scalarQuery = False
          # Here could be a conditional optimization for unique CellIDs,
          # but it actually makes a very large query slower.
 
@@ -1159,17 +1162,19 @@ class VlsvReader(object):
                use_offset = int(variable_offset + r_offset)
                fptr.seek(use_offset)
                if datatype == "float" and element_size == 4:
-                  data = np.fromfile(fptr, dtype = np.float32, count=vector_size*read_size)
+                  dtype = np.float32
                if datatype == "float" and element_size == 8:
-                  data = np.fromfile(fptr, dtype=np.float64, count=vector_size*read_size)
+                  dtype = np.float64
                if datatype == "int" and element_size == 4:
-                  data = np.fromfile(fptr, dtype=np.int32, count=vector_size*read_size)
+                  dtype = np.int32
                if datatype == "int" and element_size == 8:
-                  data = np.fromfile(fptr, dtype=np.int64, count=vector_size*read_size)
+                  dtype = np.int64
                if datatype == "uint" and element_size == 4:
-                  data = np.fromfile(fptr, dtype=np.uint32, count=vector_size*read_size)
+                  dtype = np.uint32
                if datatype == "uint" and element_size == 8:
-                  data = np.fromfile(fptr, dtype=np.uint64, count=vector_size*read_size)
+                  dtype = np.uint64
+
+               data = np.fromfile(fptr, dtype=dtype, count=vector_size*read_size)
                if len(read_offsets)!=1:
                   arraydata.append(data)
 
@@ -1178,17 +1183,23 @@ class VlsvReader(object):
             if len(read_offsets)==1 and reorder_data:
                # Many single cell id's requested
                # Pick the elements corresponding to the requested cells
-               arraydata = np.array(data)
+               arraydata = np.array(data, dtype=dtype)
                if vector_size > 1:
                   arraydata=arraydata.reshape(-1, vector_size)
                   
                append_offsets = [self.__fileindex_for_cellid[cid] for cid in cellids]
                data = arraydata[append_offsets,...]
-               data = np.squeeze(data)
+               if scalarQuery:
+                  data = np.squeeze(data)
+               else:
+                  data = np.array(data,dtype=dtype)
 
             if len(read_offsets)!=1:
                # Not-so-many single cell id's requested
-               data = np.squeeze(np.array(arraydata))
+               if(scalarQuery):
+                  data = np.squeeze(np.array(arraydata,dtype=dtype))
+               else:
+                  data = np.array(arraydata,dtype=dtype)
 
             if vector_size > 1:
                data=data.reshape(result_size, vector_size)
@@ -1198,7 +1209,7 @@ class VlsvReader(object):
                logging.info("Data variable with vector size 1: Changed magnitude operation to absolute")
                operator="absolute"
 
-            if result_size == 1:
+            if result_size == 1 and scalarQuery:
                return data_operators[operator](data[0])
             else:
                return data_operators[operator](data)
