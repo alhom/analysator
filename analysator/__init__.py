@@ -70,6 +70,13 @@ if os.getenv('PTNONINTERACTIVE') == None: #was ineq
 try:
    #import plot
    plot=lazyimport("analysator.plot")
+   def register_colormaps():
+      '''
+      Imports Analysator custom colormaps and injects them to matplotlib (will import that if needed).
+      You need to call this if you don't use analysator.plot functions but want to use analysator-provided
+      colormaps in separate matplotlib plotting calls.
+      '''
+      import plot.colormaps
 except ImportError as e:
    logging.info("Note: Did not import plot module: " + str(e))
 
